@@ -1,6 +1,6 @@
 deployment:
   tasks:
-    - export DEPLOYPATH=/home4/diazdel1/public_html/api/
+    - export DEPLOYPATH=/home4/diazdel1/public_html/AsisBackend/
     - /bin/cp -R api/* $DEPLOYPATH
     - /bin/cp -R config/* $DEPLOYPATH/config
     - /bin/cp -R controllers/* $DEPLOYPATH/controllers
