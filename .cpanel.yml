@@ -1,0 +1,8 @@
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home4/diazdel1/public_html/api/
+    - /bin/cp -R api/* $DEPLOYPATH
+    - /bin/cp -R config/* $DEPLOYPATH/config
+    - /bin/cp -R controllers/* $DEPLOYPATH/controllers
+    - /bin/cp -R models/* $DEPLOYPATH/models
+    - /bin/cp -R middleware/* $DEPLOYPATH/middleware
