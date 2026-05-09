@@ -64,5 +64,36 @@ class Empleado {
 
         return $conn->query($sql);
     }
+    public static function actualizar($id, $data) {
+
+    global $conn;
+
+    $sql = "UPDATE empleados SET
+
+        rol_id = '{$data['rol_id']}',
+        nombre = '{$data['nombre']}',
+        apellido_paterno = '{$data['apellido_paterno']}',
+        apellido_materno = '{$data['apellido_materno']}',
+        correo = '{$data['correo']}',
+        password = '{$data['password']}',
+        telefono = '{$data['telefono']}',
+        sueldo_diario = '{$data['sueldo_diario']}',
+        horario_entrada = '{$data['horario_entrada']}',
+        horario_salida = '{$data['horario_salida']}'
+
+        WHERE id = $id
+    ";
+
+    return $conn->query($sql);
+}
+
+public static function eliminar($id) {
+
+    global $conn;
+
+    $sql = "DELETE FROM empleados WHERE id = $id";
+
+    return $conn->query($sql);
+}
 }
 ?>

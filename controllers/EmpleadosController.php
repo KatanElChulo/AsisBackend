@@ -26,5 +26,24 @@ class EmpleadosController {
         Empleado::obtenerPorId($id)
     );
 }
+public function update($id) {
+
+    $data = json_decode(file_get_contents("php://input"), true);
+
+    $resultado = Empleado::actualizar($id, $data);
+
+    echo json_encode([
+        "success" => $resultado
+    ]);
+}
+
+public function delete($id) {
+
+    $resultado = Empleado::eliminar($id);
+
+    echo json_encode([
+        "success" => $resultado
+    ]);
+}
 }
 ?>
