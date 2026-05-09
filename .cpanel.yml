@@ -1,0 +1,4 @@
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home4/diazdel1/public_html/AsisBackend/
+    - /bin/cp -R * $DEPLOYPATH
