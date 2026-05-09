@@ -1,17 +1,28 @@
 <?php
-include "../config/db.php";
+include "../config/database.php";
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
-$sql = "SELECT * FROM empleados";
-$result = $conn->query($sql);
+header("Access-Control-Allow-Methods: GET, POST");
 
-$data = [];
+require_once "../controllers/empleadosController.php";
 
-while ($row = $result->fetch_assoc()) {
-    $data[] = $row;
+$controller = new EmpleadosController();
+
+$method = $_SERVER['REQUEST_METHOD'];
+
+if($method == "GET") {
+
+    if(isset($_GET['id'])) {
+
+        $controller->show($_GET['id']);
+
+    } else {
+
+        $controller->index();
+    }
 }
 
-header("Content-Type: application/json");
-echo json_encode($data);
-
+if($method == "POST") {
+    $controller->store();
+}
 ?>
