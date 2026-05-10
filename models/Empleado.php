@@ -8,7 +8,10 @@ class Empleado {
 
         global $conn;
 
-        $sql = "SELECT * FROM empleados";
+        $sql = "SELECT empleados.*, roles.nombre AS rol_nombre
+        FROM empleados
+        INNER JOIN roles
+        ON empleados.rol_id = roles.id";
 
         $resultado = $conn->query($sql);
 
