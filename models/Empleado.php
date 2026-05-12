@@ -5,7 +5,7 @@ require_once __DIR__ . "/../config/database.php";
 class Empleado {
 
     public static function obtenerTodos() {
-
+        //soy maricon
         global $conn;
 
         $sql = "SELECT empleados.*, roles.nombre AS rol_nombre
