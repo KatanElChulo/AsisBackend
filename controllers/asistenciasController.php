@@ -1,66 +1,51 @@
 <?php
 
-require_once "../models/Empleado.php";
+require_once "../models/Asistencia.php";
 
-class EmpleadosController {
+class AsistenciaController {
 
     public function index(): void {
         echo json_encode(
-            Empleado::obtenerTodos()
+            Asistencia::obtenerTodas()
         );
     }
 
-    public function store(): void {
+    public function registrar(): void {
 
         $data = json_decode(file_get_contents("php://input"), true);
 
-        if (!$data) {
+        if (!isset($data['qr'])) {
             echo json_encode([
                 "success" => false,
-                "message" => "Datos inválidos"
+                "message" => "QR no enviado"
             ]);
             return;
         }
 
-        $resultado = Empleado::crear($data);
+        $resultado = Asistencia::registrarPorQR($data['qr']);
 
         echo json_encode([
-            "success" => $resultado
+            "success" => true,
+            "message" => $resultado
         ]);
     }
 
-    public function show(int $id): void {
+    public function obtenerPorEmpleado(int $empleado_id): void {
 
-        $empleado = Empleado::obtenerPorId($id);
-
-        echo json_encode($empleado);
+        echo json_encode(
+            Asistencia::obtenerPorEmpleado($empleado_id)
+        );
     }
 
     public function update(int $id): void {
-
-        $data = json_decode(file_get_contents("php://input"), true);
-
-        if (!$data) {
-            echo json_encode([
-                "success" => false,
-                "message" => "Datos inválidos"
-            ]);
-            return;
-        }
-
-        $resultado = Empleado::actualizar($id, $data);
-
         echo json_encode([
-            "success" => $resultado
+            "message" => "No implementado"
         ]);
     }
 
     public function delete(int $id): void {
-
-        $resultado = Empleado::eliminar($id);
-
         echo json_encode([
-            "success" => $resultado
+            "message" => "No implementado"
         ]);
     }
 }
