@@ -1,50 +1,90 @@
 <?php
+
 include "../config/database.php";
 
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
 
-require_once "../controllers/AsistenciaController.php";
-
+require_once __DIR__ . "/../controllers/asistenciasController.php";
 $controller = new AsistenciaController();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-if ($method == "GET") {
+switch ($method) {
 
-    // Obtener asistencias (todas o por empleado)
-    if (isset($_GET['empleado_id'])) {
+    // =========================
+    // GET
+    // =========================
+    case "GET":
 
-        $controller->obtenerPorEmpleado((int)$_GET['empleado_id']);
+        if (isset($_GET['empleado_id'])) {
 
-    } else {
+            $controller->obtenerPorEmpleado((int) $_GET['empleado_id']);
 
-        $controller->index();
-    }
+        } else {
+
+            $controller->index();
+        }
+
+        break;
+
+    // =========================
+    // POST
+    // =========================
+    case "POST":
+
+        $controller->registrar();
+
+        break;
+
+    // =========================
+    // PUT
+    // =========================
+    case "PUT":
+
+        if (!isset($_GET['id'])) {
+
+            echo json_encode([
+                "success" => false,
+                "message" => "ID no proporcionado"
+            ]);
+            exit;
+        }
+
+        $controller->update((int) $_GET['id']);
+
+        break;
+
+    // =========================
+    // DELETE
+    // =========================
+    case "DELETE":
+
+        if (!isset($_GET['id'])) {
+
+            echo json_encode([
+                "success" => false,
+                "message" => "ID no proporcionado"
+            ]);
+            exit;
+        }
+
+        $controller->delete((int) $_GET['id']);
+
+        break;
+
+    // =========================
+    // MÉTODO NO SOPORTADO
+    // =========================
+    default:
+
+        echo json_encode([
+            "success" => false,
+            "message" => "Método no permitido"
+        ]);
+
+        break;
 }
 
-if ($method == "POST") {
-
-    // Registrar asistencia por QR
-    $controller->registrar();
-}
-
-if ($method == "PUT") {
-
-    // (Opcional) actualizar asistencia
-    if (isset($_GET['id'])) {
-
-        $controller->update((int)$_GET['id']);
-    }
-}
-
-if ($method == "DELETE") {
-
-    // (Opcional) eliminar registro
-    if (isset($_GET['id'])) {
-
-        $controller->delete((int)$_GET['id']);
-    }
-}
 ?>
