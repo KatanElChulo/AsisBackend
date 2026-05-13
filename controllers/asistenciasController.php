@@ -1,12 +1,12 @@
 <?php
 
-require_once "../models/Asistencia.php";
+require_once "../models/Asistencias.php";
 
-class AsistenciaController {
+class AsistenciasController {
 
     public function index(): void {
         echo json_encode(
-            Asistencia::obtenerTodas()
+            Asistencias::obtenerTodas()
         );
     }
 
@@ -22,7 +22,7 @@ class AsistenciaController {
             return;
         }
 
-        $resultado = Asistencia::registrarPorQR($data['qr']);
+        $resultado = Asistencias::registrarPorQR($data['qr']);
 
         echo json_encode([
             "success" => true,
@@ -33,7 +33,7 @@ class AsistenciaController {
     public function obtenerPorEmpleado(int $empleado_id): void {
 
         echo json_encode(
-            Asistencia::obtenerPorEmpleado($empleado_id)
+            Asistencias::obtenerPorEmpleado($empleado_id)
         );
     }
 

@@ -2,7 +2,7 @@
 
 require_once __DIR__ . "/../config/database.php";
 
-class Asistencia {
+class Asistencias {
 
     // Registrar asistencia por QR
     public static function registrarPorQR(string $codigo_qr): string {

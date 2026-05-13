@@ -5,7 +5,7 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
 
-require_once "../controllers/AsistenciaController.php";
+require_once "../controllers/AsistenciasController.php";
 
 $controller = new AsistenciaController();
 
