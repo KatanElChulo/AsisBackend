@@ -90,13 +90,33 @@ class Empleado {
     return $conn->query($sql);
 }
 
-public static function eliminar($id) {
+    public static function eliminar($id) {
 
     global $conn;
 
     $sql = "DELETE FROM empleados WHERE id = $id";
 
     return $conn->query($sql);
-}
+    }
+
+    public static function login($correo) {
+
+    global $conn;
+
+    $correo = $conn->real_escape_string($correo);
+
+    $sql = "SELECT empleados.*, roles.nombre AS rol_nombre
+            FROM empleados
+            INNER JOIN roles
+            ON empleados.rol_id = roles.id
+            WHERE empleados.correo = '$correo'
+            AND empleados.activo = 1
+            LIMIT 1";
+
+    $resultado = $conn->query($sql);
+
+    return $resultado->fetch_assoc();
+
+    }
 }
 ?>
