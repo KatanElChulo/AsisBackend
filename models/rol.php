@@ -4,8 +4,7 @@ require_once __DIR__ . "/../config/database.php";
 
 class Rol {
 
-
-     //Consulta
+    // CONSULTAR TODOS
     public static function obtenerTodos() {
 
         global $conn;
@@ -23,19 +22,21 @@ class Rol {
 
         return $roles;
     }
-      // (Buscar) Obtener rol por id
-    public static function obtenerPorId($id) {
+
+    // OBTENER ROL POR NOMBRE
+    public static function obtenerPorNombre($nombre) {
 
         global $conn;
 
-        $sql = "SELECT * FROM roles WHERE id = $id";
+        $sql = "SELECT * FROM roles WHERE nombre = '$nombre'";
 
         $resultado = $conn->query($sql);
 
         return $resultado->fetch_assoc();
     }
-    //Crear
-     public static function crear($data) {
+
+    // CREAR ROL
+    public static function crear($data) {
 
         global $conn;
 
@@ -48,8 +49,8 @@ class Rol {
         return $conn->query($sql);
     }
 
-    //Actualizar
-        public static function actualizar($id, $data) {
+    // ACTUALIZAR ROL
+    public static function actualizar($nombreActual, $data) {
 
         global $conn;
 
@@ -57,18 +58,18 @@ class Rol {
 
             nombre = '{$data['nombre']}'
 
-            WHERE id = $id
+            WHERE nombre = '$nombreActual'
         ";
 
         return $conn->query($sql);
     }
 
-    //Borrar
-     public static function eliminar($id) {
+    // ELIMINAR ROL
+    public static function eliminar($nombre) {
 
         global $conn;
 
-        $sql = "DELETE FROM roles WHERE id = $id";
+        $sql = "DELETE FROM roles WHERE nombre = '$nombre'";
 
         return $conn->query($sql);
     }
