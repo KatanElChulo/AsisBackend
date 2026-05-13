@@ -7,13 +7,12 @@ class RolesController {
     // OBTENER ROLES
     public function index() {
 
-        if(isset($_GET['nombre'])) {
+        if(isset($_GET['id'])) {
 
             echo json_encode(
-                Rol::obtenerPorNombre($_GET['nombre'])
+                Rol::obtenerPorId($_GET['id'])
             );
-        }
-        else {
+        } else {
 
             echo json_encode(
                 Rol::obtenerTodos()
@@ -37,14 +36,14 @@ class RolesController {
     }
 
     // ACTUALIZAR ROL
-    public function update($nombre) {
+    public function update($id) {
 
         $data = json_decode(
             file_get_contents("php://input"),
             true
         );
 
-        Rol::actualizar($nombre, $data);
+        Rol::actualizar($id, $data);
 
         echo json_encode([
             "mensaje" => "Rol actualizado"
@@ -52,13 +51,14 @@ class RolesController {
     }
 
     // ELIMINAR ROL
-    public function delete($nombre) {
+    public function delete($id) {
 
-        Rol::eliminar($nombre);
+        Rol::eliminar($id);
 
         echo json_encode([
             "mensaje" => "Rol eliminado"
         ]);
     }
 }
+
 ?>

@@ -16,19 +16,18 @@ class Rol {
         $roles = [];
 
         while($fila = $resultado->fetch_assoc()) {
-
             $roles[] = $fila;
         }
 
         return $roles;
     }
 
-    // OBTENER ROL POR NOMBRE
-    public static function obtenerPorNombre($nombre) {
+    // OBTENER ROL POR ID
+    public static function obtenerPorId($id) {
 
         global $conn;
 
-        $sql = "SELECT * FROM roles WHERE nombre = '$nombre'";
+        $sql = "SELECT * FROM roles WHERE id = $id";
 
         $resultado = $conn->query($sql);
 
@@ -40,38 +39,33 @@ class Rol {
 
         global $conn;
 
-        $sql = "INSERT INTO roles (
-            nombre
-        ) VALUES (
-            '{$data['nombre']}'
-        )";
+        $sql = "INSERT INTO roles (nombre)
+                VALUES ('{$data['nombre']}')";
 
         return $conn->query($sql);
     }
 
-    // ACTUALIZAR ROL
-    public static function actualizar($nombreActual, $data) {
+    // ACTUALIZAR ROL POR ID
+    public static function actualizar($id, $data) {
 
         global $conn;
 
         $sql = "UPDATE roles SET
-
-            nombre = '{$data['nombre']}'
-
-            WHERE nombre = '$nombreActual'
-        ";
+                    nombre = '{$data['nombre']}'
+                WHERE id = $id";
 
         return $conn->query($sql);
     }
 
-    // ELIMINAR ROL
-    public static function eliminar($nombre) {
+    // ELIMINAR ROL POR ID
+    public static function eliminar($id) {
 
         global $conn;
 
-        $sql = "DELETE FROM roles WHERE nombre = '$nombre'";
+        $sql = "DELETE FROM roles WHERE id = $id";
 
         return $conn->query($sql);
     }
 }
+
 ?>

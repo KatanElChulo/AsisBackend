@@ -13,27 +13,19 @@ $method = $_SERVER['REQUEST_METHOD'];
 switch($method) {
 
     case "GET":
-
         $controller->index();
-
-    break;
+        break;
 
     case "POST":
-
         $controller->store();
-
-    break;
+        break;
 
     case "PUT":
-
-        $controller->update($_GET['nombre']);
-
-    break;
+        $controller->update($_GET['id']);
+        break;
 
     case "DELETE":
-
-        $controller->delete($_GET['nombre']);
-
-    break;
+        $controller->delete($_GET['id']);
+        break;
 }
 ?>
