@@ -1,11 +1,16 @@
 <?php
 
+<<<<<<< HEAD
 require_once "../models/asistencias.php";
+=======
+require_once "../models/Asistencias.php";
+>>>>>>> acfd6cfe4bef54244906ad245c8f120e51dad102
 
-class AsistenciaController {
+class AsistenciasController {
 
     // OBTENER TODAS LAS ASISTENCIAS
     public function index(): void {
+<<<<<<< HEAD
 
         try {
 
@@ -21,6 +26,11 @@ class AsistenciaController {
                 "message" => "Error al obtener asistencias"
             ]);
         }
+=======
+        echo json_encode(
+            Asistencias::obtenerTodas()
+        );
+>>>>>>> acfd6cfe4bef54244906ad245c8f120e51dad102
     }
 
     // REGISTRAR POR QR
@@ -37,7 +47,7 @@ class AsistenciaController {
             return;
         }
 
-        $resultado = Asistencia::registrarPorQR($data['qr']);
+        $resultado = Asistencias::registrarPorQR($data['qr']);
 
         echo json_encode([
             "success" => true,
@@ -48,6 +58,7 @@ class AsistenciaController {
     // OBTENER POR EMPLEADO
     public function obtenerPorEmpleado(int $empleado_id): void {
 
+<<<<<<< HEAD
         try {
 
             echo json_encode([
@@ -62,6 +73,11 @@ class AsistenciaController {
                 "message" => "Error al obtener asistencias del empleado"
             ]);
         }
+=======
+        echo json_encode(
+            Asistencias::obtenerPorEmpleado($empleado_id)
+        );
+>>>>>>> acfd6cfe4bef54244906ad245c8f120e51dad102
     }
 
     // ACTUALIZAR (PENDIENTE)
