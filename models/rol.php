@@ -2,70 +2,140 @@
 
 require_once __DIR__ . "/../config/database.php";
 
-class Rol {
+class Rol
+{
+    private static function getDB()
+    {
+        global $conn, $conexion, $mysqli;
 
-    // CONSULTAR TODOS
-    public static function obtenerTodos() {
+        if (isset($conn) && $conn instanceof mysqli) {
+            return $conn;
+        }
 
-        global $conn;
+        if (isset($conexion) && $conexion instanceof mysqli) {
+            return $conexion;
+        }
 
-        $sql = "SELECT * FROM roles";
+        if (isset($mysqli) && $mysqli instanceof mysqli) {
+            return $mysqli;
+        }
 
-        $resultado = $conn->query($sql);
+        throw new Exception("No se encontró una conexión válida a la base de datos");
+    }
+
+    public static function obtenerTodos()
+    {
+        $db = self::getDB();
+
+        $sql = "SELECT id, nombre FROM roles ORDER BY id ASC";
+
+        $resultado = $db->query($sql);
+
+        if (!$resultado) {
+            throw new Exception("Error al consultar roles: " . $db->error);
+        }
 
         $roles = [];
 
-        while($fila = $resultado->fetch_assoc()) {
+        while ($fila = $resultado->fetch_assoc()) {
             $roles[] = $fila;
         }
 
         return $roles;
     }
 
-    // OBTENER ROL POR ID
-    public static function obtenerPorId($id) {
+    public static function obtenerPorId($id)
+    {
+        $db = self::getDB();
 
-        global $conn;
+        $sql = "SELECT id, nombre FROM roles WHERE id = ? LIMIT 1";
 
-        $sql = "SELECT * FROM roles WHERE id = $id";
+        $stmt = $db->prepare($sql);
 
-        $resultado = $conn->query($sql);
+        if (!$stmt) {
+            throw new Exception("Error al preparar consulta: " . $db->error);
+        }
+
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+
+        $resultado = $stmt->get_result();
 
         return $resultado->fetch_assoc();
     }
 
-    // CREAR ROL
-    public static function crear($data) {
+    public static function crear($data)
+    {
+        $db = self::getDB();
 
-        global $conn;
+        $nombre = trim($data["nombre"] ?? "");
 
-        $sql = "INSERT INTO roles (nombre)
-                VALUES ('{$data['nombre']}')";
+        if ($nombre === "") {
+            throw new Exception("El nombre del rol es obligatorio");
+        }
 
-        return $conn->query($sql);
+        $sql = "INSERT INTO roles (nombre) VALUES (?)";
+
+        $stmt = $db->prepare($sql);
+
+        if (!$stmt) {
+            throw new Exception("Error al preparar inserción: " . $db->error);
+        }
+
+        $stmt->bind_param("s", $nombre);
+
+        if (!$stmt->execute()) {
+            throw new Exception("Error al crear rol: " . $stmt->error);
+        }
+
+        return true;
     }
 
-    // ACTUALIZAR ROL POR ID
-    public static function actualizar($id, $data) {
+    public static function actualizar($id, $data)
+    {
+        $db = self::getDB();
 
-        global $conn;
+        $nombre = trim($data["nombre"] ?? "");
 
-        $sql = "UPDATE roles SET
-                    nombre = '{$data['nombre']}'
-                WHERE id = $id";
+        if ($nombre === "") {
+            throw new Exception("El nombre del rol es obligatorio");
+        }
 
-        return $conn->query($sql);
+        $sql = "UPDATE roles SET nombre = ? WHERE id = ?";
+
+        $stmt = $db->prepare($sql);
+
+        if (!$stmt) {
+            throw new Exception("Error al preparar actualización: " . $db->error);
+        }
+
+        $stmt->bind_param("si", $nombre, $id);
+
+        if (!$stmt->execute()) {
+            throw new Exception("Error al actualizar rol: " . $stmt->error);
+        }
+
+        return true;
     }
 
-    // ELIMINAR ROL POR ID
-    public static function eliminar($id) {
+    public static function eliminar($id)
+    {
+        $db = self::getDB();
 
-        global $conn;
+        $sql = "DELETE FROM roles WHERE id = ?";
 
-        $sql = "DELETE FROM roles WHERE id = $id";
+        $stmt = $db->prepare($sql);
 
-        return $conn->query($sql);
+        if (!$stmt) {
+            throw new Exception("Error al preparar eliminación: " . $db->error);
+        }
+
+        $stmt->bind_param("i", $id);
+
+        if (!$stmt->execute()) {
+            throw new Exception("Error al eliminar rol: " . $stmt->error);
+        }
+
+        return true;
     }
 }
-
-?>
