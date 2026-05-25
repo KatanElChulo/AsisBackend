@@ -1,44 +1,46 @@
 <?php
-include "../config/database.php";
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
 
-require_once __DIR__ . "/../controllers/empleadosController.php";
-require_once __DIR__ . "/../config/database.php";
+header("Content-Type: application/json");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+
+if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+    exit;
+}
+
+require_once __DIR__ . "/../controllers/EmpleadosController.php";
+
 $controller = new EmpleadosController();
 
-$method = $_SERVER['REQUEST_METHOD'];
+$method = $_SERVER["REQUEST_METHOD"];
+$id = $_GET["id"] ?? null;
 
-if($method == "GET") {
+switch ($method) {
+    case "GET":
+        if ($id) {
+            $controller->show($id);
+        } else {
+            $controller->index();
+        }
+        break;
 
-    if(isset($_GET['id'])) {
+    case "POST":
+        $controller->store();
+        break;
 
-        $controller->show($_GET['id']);
+    case "PUT":
+        $controller->update($id);
+        break;
 
-    } else {
+    case "DELETE":
+        $controller->delete($id);
+        break;
 
-        $controller->index();
-    }
+    default:
+        echo json_encode([
+            "success" => false,
+            "message" => "Método no permitido"
+        ]);
+        break;
 }
-
-if($method == "POST") {
-    $controller->store();
-}
-if($method == "PUT") {
-
-    if(isset($_GET['id'])) {
-
-        $controller->update($_GET['id']);
-    }
-    
-}
-if($method == "DELETE") {
-
-    if(isset($_GET['id'])) {
-
-        $controller->delete($_GET['id']);
-    }
-
-}
-?>
