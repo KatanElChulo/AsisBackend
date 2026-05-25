@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . "/../models/Rol.php";
+require_once __DIR__ . "/../models/rol.php";
 
 class RolesController
 {
@@ -9,14 +9,6 @@ class RolesController
         try {
             if (isset($_GET["id"])) {
                 $rol = Rol::obtenerPorId($_GET["id"]);
-
-                if (!$rol) {
-                    echo json_encode([
-                        "success" => false,
-                        "message" => "Rol no encontrado"
-                    ]);
-                    return;
-                }
 
                 echo json_encode($rol);
                 return;
@@ -61,14 +53,6 @@ class RolesController
     public function update($id)
     {
         try {
-            if (!$id) {
-                echo json_encode([
-                    "success" => false,
-                    "message" => "ID no recibido"
-                ]);
-                return;
-            }
-
             $data = json_decode(file_get_contents("php://input"), true);
 
             Rol::actualizar($id, $data);
@@ -92,14 +76,6 @@ class RolesController
     public function delete($id)
     {
         try {
-            if (!$id) {
-                echo json_encode([
-                    "success" => false,
-                    "message" => "ID no recibido"
-                ]);
-                return;
-            }
-
             Rol::eliminar($id);
 
             echo json_encode([
