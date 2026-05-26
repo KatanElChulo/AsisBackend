@@ -5,7 +5,21 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 
-require_once "../config/conexion.php";
+if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+    exit;
+}
+
+require_once __DIR__ . "/../config/database.php";
+
+$db = $conn ?? $conexion ?? $mysqli ?? null;
+
+if (!$db) {
+    echo json_encode([
+        "success" => false,
+        "message" => "No se encontró conexión a la base de datos"
+    ]);
+    exit;
+}
 
 $data = json_decode(file_get_contents("php://input"), true);
 
@@ -18,7 +32,12 @@ $longitud = $data["longitud"] ?? null;
 if (!$empleado_id || !$tipo || !$token) {
     echo json_encode([
         "success" => false,
-        "message" => "Datos incompletos"
+        "message" => "Datos incompletos",
+        "debug" => [
+            "empleado_id" => $empleado_id,
+            "tipo" => $tipo,
+            "token" => $token
+        ]
     ]);
     exit;
 }
@@ -31,13 +50,82 @@ if ($tipo !== "entrada" && $tipo !== "salida") {
     exit;
 }
 
-/* VALIDAR QR */
-$sqlQR = "SELECT id FROM qr_tokens
-          WHERE token = ?
-          AND expira_en >= NOW()
-          LIMIT 1";
+/*
+    VALIDAR QR
 
-$stmtQR = $conexion->prepare($sqlQR);
+    Este código acepta dos formas:
+    1. Si qr_tokens tiene columna expira_en, valida que no esté expirado.
+    2. Si no tiene expira_en, solo valida que el token exista y esté activo.
+*/
+
+$sqlColumnas = "SHOW COLUMNS FROM qr_tokens";
+$resultColumnas = $db->query($sqlColumnas);
+
+if (!$resultColumnas) {
+    echo json_encode([
+        "success" => false,
+        "message" => "No se pudo leer la tabla qr_tokens",
+        "error" => $db->error
+    ]);
+    exit;
+}
+
+$columnas = [];
+
+while ($fila = $resultColumnas->fetch_assoc()) {
+    $columnas[] = $fila["Field"];
+}
+
+if (!in_array("token", $columnas)) {
+    echo json_encode([
+        "success" => false,
+        "message" => "La tabla qr_tokens no tiene columna token",
+        "columnas_detectadas" => $columnas
+    ]);
+    exit;
+}
+
+if (in_array("expira_en", $columnas) && in_array("activo", $columnas)) {
+
+    $sqlQR = "SELECT id FROM qr_tokens
+              WHERE token = ?
+              AND activo = 1
+              AND expira_en >= NOW()
+              LIMIT 1";
+
+} elseif (in_array("expira_en", $columnas)) {
+
+    $sqlQR = "SELECT id FROM qr_tokens
+              WHERE token = ?
+              AND expira_en >= NOW()
+              LIMIT 1";
+
+} elseif (in_array("activo", $columnas)) {
+
+    $sqlQR = "SELECT id FROM qr_tokens
+              WHERE token = ?
+              AND activo = 1
+              LIMIT 1";
+
+} else {
+
+    $sqlQR = "SELECT id FROM qr_tokens
+              WHERE token = ?
+              LIMIT 1";
+}
+
+$stmtQR = $db->prepare($sqlQR);
+
+if (!$stmtQR) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Error al preparar validación QR",
+        "error" => $db->error,
+        "sql" => $sqlQR
+    ]);
+    exit;
+}
+
 $stmtQR->bind_param("s", $token);
 $stmtQR->execute();
 
@@ -46,25 +134,37 @@ $resultQR = $stmtQR->get_result();
 if ($resultQR->num_rows === 0) {
     echo json_encode([
         "success" => false,
-        "message" => "QR inválido o expirado"
+        "message" => "QR inválido o expirado",
+        "token_recibido" => $token,
+        "columnas_qr_tokens" => $columnas
     ]);
     exit;
 }
 
-$qr = $resultQR->fetch_assoc();
-$qr_id = $qr["id"];
-
 $fecha = date("Y-m-d");
 $ahora = date("Y-m-d H:i:s");
 
-/* BUSCAR ASISTENCIA DEL DÍA */
+/*
+    BUSCAR ASISTENCIA DEL DÍA
+*/
+
 $sqlBuscar = "SELECT id, hora_entrada, hora_salida
               FROM asistencias
               WHERE empleado_id = ?
               AND fecha = ?
               LIMIT 1";
 
-$stmtBuscar = $conexion->prepare($sqlBuscar);
+$stmtBuscar = $db->prepare($sqlBuscar);
+
+if (!$stmtBuscar) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Error al preparar búsqueda de asistencia",
+        "error" => $db->error
+    ]);
+    exit;
+}
+
 $stmtBuscar->bind_param("is", $empleado_id, $fecha);
 $stmtBuscar->execute();
 
@@ -76,7 +176,7 @@ if ($tipo === "entrada") {
 
         $asistencia = $resultBuscar->fetch_assoc();
 
-        if ($asistencia["hora_entrada"] !== null) {
+        if ($asistencia["hora_entrada"] !== null && $asistencia["hora_entrada"] !== "") {
             echo json_encode([
                 "success" => false,
                 "message" => "Ya registraste tu entrada hoy"
@@ -84,6 +184,12 @@ if ($tipo === "entrada") {
             exit;
         }
     }
+
+    /*
+        Insertar o actualizar entrada.
+        OJO: Para que ON DUPLICATE KEY funcione bien,
+        tu tabla asistencias debe tener UNIQUE(empleado_id, fecha).
+    */
 
     $sql = "INSERT INTO asistencias (
                 empleado_id,
@@ -104,7 +210,17 @@ if ($tipo === "entrada") {
                 metodo_registro = 'QR',
                 estatus = 'ASISTENCIA'";
 
-    $stmt = $conexion->prepare($sql);
+    $stmt = $db->prepare($sql);
+
+    if (!$stmt) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Error al preparar registro de entrada",
+            "error" => $db->error
+        ]);
+        exit;
+    }
+
     $stmt->bind_param(
         "issdds",
         $empleado_id,
@@ -127,7 +243,7 @@ if ($tipo === "entrada") {
 
     $asistencia = $resultBuscar->fetch_assoc();
 
-    if ($asistencia["hora_salida"] !== null) {
+    if ($asistencia["hora_salida"] !== null && $asistencia["hora_salida"] !== "") {
         echo json_encode([
             "success" => false,
             "message" => "Ya registraste tu salida hoy"
@@ -144,7 +260,17 @@ if ($tipo === "entrada") {
             WHERE empleado_id = ?
             AND fecha = ?";
 
-    $stmt = $conexion->prepare($sql);
+    $stmt = $db->prepare($sql);
+
+    if (!$stmt) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Error al preparar registro de salida",
+            "error" => $db->error
+        ]);
+        exit;
+    }
+
     $stmt->bind_param(
         "sddsis",
         $ahora,
@@ -166,6 +292,7 @@ if ($stmt->execute()) {
 } else {
     echo json_encode([
         "success" => false,
-        "message" => "Error al registrar asistencia"
+        "message" => "Error al registrar asistencia",
+        "error" => $stmt->error
     ]);
 }
