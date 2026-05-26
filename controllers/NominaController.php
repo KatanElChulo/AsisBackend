@@ -13,88 +13,144 @@ class NominaController
 
     public function listar()
     {
-        echo json_encode([
-            "success" => true,
-            "data" => $this->model->listar()
-        ]);
+        try {
+            echo json_encode([
+                "success" => true,
+                "data" => $this->model->listar()
+            ]);
+
+        } catch (Exception $e) {
+            http_response_code(500);
+
+            echo json_encode([
+                "success" => false,
+                "message" => "Error al listar nóminas",
+                "error" => $e->getMessage()
+            ]);
+        }
     }
 
     public function obtener($id)
     {
-        $nomina = $this->model->obtener($id);
+        try {
+            $nomina = $this->model->obtener($id);
 
-        if (!$nomina) {
+            if (!$nomina) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Nómina no encontrada"
+                ]);
+                return;
+            }
+
+            echo json_encode([
+                "success" => true,
+                "data" => $nomina
+            ]);
+
+        } catch (Exception $e) {
+            http_response_code(500);
+
             echo json_encode([
                 "success" => false,
-                "message" => "Nómina no encontrada"
+                "message" => "Error al obtener nómina",
+                "error" => $e->getMessage()
             ]);
-            return;
         }
-
-        echo json_encode([
-            "success" => true,
-            "data" => $nomina
-        ]);
     }
 
     public function crear($data)
     {
-        if (
-            empty($data["empleado_id"]) ||
-            empty($data["fecha_inicio"]) ||
-            empty($data["fecha_fin"]) ||
-            !isset($data["dias_trabajados"]) ||
-            !isset($data["faltas"]) ||
-            !isset($data["sueldo_diario"])
-        ) {
+        try {
+            if (!$data) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "No se recibieron datos"
+                ]);
+                return;
+            }
+
+            $resultado = $this->model->crear($data);
+
+            echo json_encode([
+                "success" => $resultado,
+                "message" => "Nómina registrada correctamente"
+            ]);
+
+        } catch (Exception $e) {
+            http_response_code(500);
+
             echo json_encode([
                 "success" => false,
-                "message" => "Datos incompletos"
+                "message" => "Error al registrar nómina",
+                "error" => $e->getMessage()
             ]);
-            return;
         }
-
-        $resultado = $this->model->crear($data);
-
-        echo json_encode([
-            "success" => $resultado,
-            "message" => $resultado ? "Nómina registrada correctamente" : "Error al registrar nómina"
-        ]);
     }
 
     public function actualizar($id, $data)
     {
-        if (!$id) {
+        try {
+            if (!$id) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "ID no recibido"
+                ]);
+                return;
+            }
+
+            if (!$data) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "No se recibieron datos"
+                ]);
+                return;
+            }
+
+            $resultado = $this->model->actualizar($id, $data);
+
+            echo json_encode([
+                "success" => $resultado,
+                "message" => "Nómina actualizada correctamente"
+            ]);
+
+        } catch (Exception $e) {
+            http_response_code(500);
+
             echo json_encode([
                 "success" => false,
-                "message" => "ID no recibido"
+                "message" => "Error al actualizar nómina",
+                "error" => $e->getMessage()
             ]);
-            return;
         }
-
-        $resultado = $this->model->actualizar($id, $data);
-
-        echo json_encode([
-            "success" => $resultado,
-            "message" => $resultado ? "Nómina actualizada correctamente" : "Error al actualizar nómina"
-        ]);
     }
 
     public function eliminar($id)
     {
-        if (!$id) {
+        try {
+            if (!$id) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "ID no recibido"
+                ]);
+                return;
+            }
+
+            $resultado = $this->model->eliminar($id);
+
+            echo json_encode([
+                "success" => $resultado,
+                "message" => "Nómina eliminada correctamente"
+            ]);
+
+        } catch (Exception $e) {
+            http_response_code(500);
+
             echo json_encode([
                 "success" => false,
-                "message" => "ID no recibido"
+                "message" => "Error al eliminar nómina",
+                "error" => $e->getMessage()
             ]);
-            return;
         }
-
-        $resultado = $this->model->eliminar($id);
-
-        echo json_encode([
-            "success" => $resultado,
-            "message" => $resultado ? "Nómina eliminada correctamente" : "Error al eliminar nómina"
-        ]);
     }
 }

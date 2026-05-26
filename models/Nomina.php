@@ -31,6 +31,10 @@ class Nomina
 
         $resultado = $this->db->query($sql);
 
+        if (!$resultado) {
+            throw new Exception("Error al consultar nóminas: " . $this->db->error);
+        }
+
         $nominas = [];
 
         while ($fila = $resultado->fetch_assoc()) {
@@ -42,9 +46,14 @@ class Nomina
 
     public function obtener($id)
     {
-        $sql = "SELECT * FROM nominas WHERE id = ?";
+        $sql = "SELECT * FROM nominas WHERE id = ? LIMIT 1";
 
         $stmt = $this->db->prepare($sql);
+
+        if (!$stmt) {
+            throw new Exception("Error al preparar consulta: " . $this->db->error);
+        }
+
         $stmt->bind_param("i", $id);
         $stmt->execute();
 
@@ -53,20 +62,23 @@ class Nomina
 
     public function crear($data)
     {
-        $empleado_id = $data["empleado_id"];
-        $fecha_inicio = $data["fecha_inicio"];
-        $fecha_fin = $data["fecha_fin"];
-        $dias_trabajados = $data["dias_trabajados"];
-        $faltas = $data["faltas"];
-        $sueldo_diario = $data["sueldo_diario"];
+        $empleado_id = $data["empleado_id"] ?? null;
+        $fecha_inicio = $data["fecha_inicio"] ?? null;
+        $fecha_fin = $data["fecha_fin"] ?? null;
+        $dias_trabajados = $data["dias_trabajados"] ?? 0;
+        $faltas = $data["faltas"] ?? 0;
+        $sueldo_diario = $data["sueldo_diario"] ?? 0;
 
-        $dias_pagados = $dias_trabajados - $faltas;
-
-        if ($dias_pagados < 0) {
-            $dias_pagados = 0;
+        if (!$empleado_id || !$fecha_inicio || !$fecha_fin) {
+            throw new Exception("Datos incompletos");
         }
 
-        $total_pago = $dias_pagados * $sueldo_diario;
+        /*
+            Como dias_trabajados ya representa los días reales trabajados,
+            el total debe ser:
+            dias_trabajados * sueldo_diario
+        */
+        $total_pago = $dias_trabajados * $sueldo_diario;
 
         $sql = "INSERT INTO nominas
                 (
@@ -82,6 +94,10 @@ class Nomina
 
         $stmt = $this->db->prepare($sql);
 
+        if (!$stmt) {
+            throw new Exception("Error al preparar inserción: " . $this->db->error);
+        }
+
         $stmt->bind_param(
             "issiidd",
             $empleado_id,
@@ -93,25 +109,27 @@ class Nomina
             $total_pago
         );
 
-        return $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new Exception("Error al crear nómina: " . $stmt->error);
+        }
+
+        return true;
     }
 
     public function actualizar($id, $data)
     {
-        $empleado_id = $data["empleado_id"];
-        $fecha_inicio = $data["fecha_inicio"];
-        $fecha_fin = $data["fecha_fin"];
-        $dias_trabajados = $data["dias_trabajados"];
-        $faltas = $data["faltas"];
-        $sueldo_diario = $data["sueldo_diario"];
+        $empleado_id = $data["empleado_id"] ?? null;
+        $fecha_inicio = $data["fecha_inicio"] ?? null;
+        $fecha_fin = $data["fecha_fin"] ?? null;
+        $dias_trabajados = $data["dias_trabajados"] ?? 0;
+        $faltas = $data["faltas"] ?? 0;
+        $sueldo_diario = $data["sueldo_diario"] ?? 0;
 
-        $dias_pagados = $dias_trabajados - $faltas;
-
-        if ($dias_pagados < 0) {
-            $dias_pagados = 0;
+        if (!$empleado_id || !$fecha_inicio || !$fecha_fin) {
+            throw new Exception("Datos incompletos");
         }
 
-        $total_pago = $dias_pagados * $sueldo_diario;
+        $total_pago = $dias_trabajados * $sueldo_diario;
 
         $sql = "UPDATE nominas SET
                     empleado_id = ?,
@@ -125,6 +143,10 @@ class Nomina
 
         $stmt = $this->db->prepare($sql);
 
+        if (!$stmt) {
+            throw new Exception("Error al preparar actualización: " . $this->db->error);
+        }
+
         $stmt->bind_param(
             "issiiddi",
             $empleado_id,
@@ -137,7 +159,11 @@ class Nomina
             $id
         );
 
-        return $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new Exception("Error al actualizar nómina: " . $stmt->error);
+        }
+
+        return true;
     }
 
     public function eliminar($id)
@@ -145,8 +171,17 @@ class Nomina
         $sql = "DELETE FROM nominas WHERE id = ?";
 
         $stmt = $this->db->prepare($sql);
+
+        if (!$stmt) {
+            throw new Exception("Error al preparar eliminación: " . $this->db->error);
+        }
+
         $stmt->bind_param("i", $id);
 
-        return $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new Exception("Error al eliminar nómina: " . $stmt->error);
+        }
+
+        return true;
     }
 }

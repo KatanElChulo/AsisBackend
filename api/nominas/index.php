@@ -12,12 +12,12 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../controllers/NominaController.php";
 
-$db = $conexion ?? $conn ?? $mysqli ?? null;
+$db = $conn ?? $conexion ?? $mysqli ?? null;
 
 if (!$db) {
     echo json_encode([
         "success" => false,
-        "message" => "No se encontró la conexión a la base de datos"
+        "message" => "No se encontró conexión a la base de datos"
     ]);
     exit;
 }
