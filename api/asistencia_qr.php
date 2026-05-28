@@ -40,7 +40,7 @@ $radioPermitidoMetros = 100;
     Desde 07:11 = RETARDO
 */
 
-$toleranciaMinutos = 10;
+$toleranciaMinutos = 20;
 
 /*
     FUNCION PARA CALCULAR DISTANCIA EN METROS
