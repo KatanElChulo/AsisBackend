@@ -21,6 +21,41 @@ if (!$db) {
     exit;
 }
 
+/*
+    CONFIGURACIÓN DE UBICACIÓN DEL NEGOCIO
+
+    Cambia estas coordenadas por las reales de tu local.
+    Puedes obtenerlas desde Google Maps:
+    clic derecho en el lugar -> copia latitud,longitud.
+*/
+
+$latitudNegocio = 19.432600;
+$longitudNegocio = -99.133200;
+$radioPermitidoMetros = 100;
+
+/*
+    FUNCION PARA CALCULAR DISTANCIA EN METROS
+*/
+
+function calcularDistanciaMetros($lat1, $lon1, $lat2, $lon2)
+{
+    $radioTierra = 6371000;
+
+    $lat1Rad = deg2rad($lat1);
+    $lat2Rad = deg2rad($lat2);
+
+    $deltaLat = deg2rad($lat2 - $lat1);
+    $deltaLon = deg2rad($lon2 - $lon1);
+
+    $a = sin($deltaLat / 2) * sin($deltaLat / 2) +
+         cos($lat1Rad) * cos($lat2Rad) *
+         sin($deltaLon / 2) * sin($deltaLon / 2);
+
+    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+    return $radioTierra * $c;
+}
+
 $data = json_decode(file_get_contents("php://input"), true);
 
 $empleado_id = $data["empleado_id"] ?? null;
@@ -28,6 +63,7 @@ $tipo = $data["tipo"] ?? null;
 $token = $data["token"] ?? null;
 $latitud = $data["latitud"] ?? null;
 $longitud = $data["longitud"] ?? null;
+$precision = $data["precision"] ?? null;
 
 if (!$empleado_id || !$tipo || !$token) {
     echo json_encode([
@@ -51,11 +87,60 @@ if ($tipo !== "entrada" && $tipo !== "salida") {
 }
 
 /*
-    VALIDAR QR
+    VALIDAR QUE SÍ LLEGÓ UBICACIÓN
+*/
 
-    Este código acepta dos formas:
-    1. Si qr_tokens tiene columna expira_en, valida que no esté expirado.
-    2. Si no tiene expira_en, solo valida que el token exista y esté activo.
+if ($latitud === null || $longitud === null || $latitud === "" || $longitud === "") {
+    echo json_encode([
+        "success" => false,
+        "message" => "No se recibió tu ubicación. Activa el GPS y permite la ubicación."
+    ]);
+    exit;
+}
+
+$latitud = floatval($latitud);
+$longitud = floatval($longitud);
+$precision = $precision !== null ? floatval($precision) : null;
+
+/*
+    VALIDAR PRECISIÓN DEL GPS
+
+    Si el celular reporta una precisión muy mala, se bloquea.
+    Puedes subirlo a 150 o 200 si a tus empleados les falla mucho.
+*/
+
+if ($precision !== null && $precision > 150) {
+    echo json_encode([
+        "success" => false,
+        "message" => "La precisión de tu ubicación es muy baja. Activa GPS de alta precisión e intenta de nuevo.",
+        "precision_metros" => round($precision, 2)
+    ]);
+    exit;
+}
+
+/*
+    VALIDAR DISTANCIA AL NEGOCIO
+*/
+
+$distanciaMetros = calcularDistanciaMetros(
+    $latitudNegocio,
+    $longitudNegocio,
+    $latitud,
+    $longitud
+);
+
+if ($distanciaMetros > $radioPermitidoMetros) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Estás fuera del área permitida para registrar asistencia. Distancia aproximada: " . round($distanciaMetros) . " metros.",
+        "distancia_metros" => round($distanciaMetros, 2),
+        "radio_permitido_metros" => $radioPermitidoMetros
+    ]);
+    exit;
+}
+
+/*
+    VALIDAR QR
 */
 
 $sqlColumnas = "SHOW COLUMNS FROM qr_tokens";
@@ -185,12 +270,6 @@ if ($tipo === "entrada") {
         }
     }
 
-    /*
-        Insertar o actualizar entrada.
-        OJO: Para que ON DUPLICATE KEY funcione bien,
-        tu tabla asistencias debe tener UNIQUE(empleado_id, fecha).
-    */
-
     $sql = "INSERT INTO asistencias (
                 empleado_id,
                 fecha,
@@ -287,7 +366,8 @@ if ($stmt->execute()) {
         "success" => true,
         "message" => $tipo === "entrada"
             ? "Entrada registrada correctamente"
-            : "Salida registrada correctamente"
+            : "Salida registrada correctamente",
+        "distancia_metros" => round($distanciaMetros, 2)
     ]);
 } else {
     echo json_encode([
