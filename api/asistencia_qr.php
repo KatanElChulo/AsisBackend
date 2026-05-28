@@ -32,18 +32,28 @@ $longitudNegocio = -99.05848817874441;
 $radioPermitidoMetros = 100;
 
 /*
-    CONFIGURACIÓN DE RETARDOS
+    CONFIGURACIÓN DE HORARIOS
 
-    Entrada: 07:00
-    Tolerancia: 20 minutos
-    Hasta 07:20 = ASISTENCIA
-    Desde 07:21 = RETARDO
+    Ejemplo:
+    Horario entrada: 07:00
+    Anticipación permitida: 20 minutos
+    Tolerancia retardo: 20 minutos
+
+    Antes de 06:40 = NO PERMITIDO
+    06:40 a 07:20 = ASISTENCIA
+    07:21 en adelante = RETARDO
+
+    Salida:
+    Si horario_salida es 16:00
+    Antes de 16:00 = NO PERMITIDO
+    16:00 en adelante = PERMITIDO
 */
 
 $toleranciaMinutos = 20;
+$anticipacionEntradaMinutos = 20;
 
 /*
-    FUNCION PARA CALCULAR DISTANCIA EN METROS
+    FUNCIÓN PARA CALCULAR DISTANCIA EN METROS
 */
 
 function calcularDistanciaMetros($lat1, $lon1, $lat2, $lon2)
@@ -66,7 +76,7 @@ function calcularDistanciaMetros($lat1, $lon1, $lat2, $lon2)
 }
 
 /*
-    FUNCION PARA DETERMINAR SI ES ASISTENCIA O RETARDO
+    FUNCIÓN PARA DETERMINAR SI ES ASISTENCIA O RETARDO
 */
 
 function calcularEstatusEntrada($fecha, $horaReal, $horarioEntrada, $toleranciaMinutos)
@@ -176,7 +186,7 @@ $horarioEntrada = $empleado["horario_entrada"];
 $horarioSalida = $empleado["horario_salida"];
 
 /*
-    VALIDAR QUE SÍ LLEGÓ UBICACIÓN
+    VALIDAR UBICACIÓN
 */
 
 if ($latitud === null || $longitud === null || $latitud === "" || $longitud === "") {
@@ -192,7 +202,7 @@ $longitud = floatval($longitud);
 $precision = $precision !== null ? floatval($precision) : null;
 
 /*
-    VALIDAR PRECISIÓN DEL GPS
+    VALIDAR PRECISIÓN GPS
 */
 
 if ($precision !== null && $precision > 150) {
@@ -341,6 +351,10 @@ $stmtBuscar->execute();
 
 $resultBuscar = $stmtBuscar->get_result();
 
+/*
+    REGISTRAR ENTRADA
+*/
+
 if ($tipo === "entrada") {
 
     if ($resultBuscar->num_rows > 0) {
@@ -352,6 +366,36 @@ if ($tipo === "entrada") {
                 "success" => false,
                 "message" => "Ya registraste tu entrada hoy"
             ]);
+            exit;
+        }
+    }
+
+    /*
+        VALIDAR QUE NO REGISTRE ENTRADA DEMASIADO TEMPRANO
+    */
+
+    if ($horarioEntrada !== null && $horarioEntrada !== "") {
+
+        $horaEntradaMinima =
+            new DateTime($fecha . " " . $horarioEntrada);
+
+        $horaEntradaMinima->modify(
+            "-" . intval($anticipacionEntradaMinutos) . " minutes"
+        );
+
+        $horaRegistroEntrada =
+            new DateTime($ahora);
+
+        if ($horaRegistroEntrada < $horaEntradaMinima) {
+
+            echo json_encode([
+                "success" => false,
+                "message" => "No puedes registrar entrada tan temprano. Puedes registrar desde las " . $horaEntradaMinima->format("H:i") . ".",
+                "horario_entrada" => $horarioEntrada,
+                "hora_minima_registro" => $horaEntradaMinima->format("H:i:s"),
+                "hora_actual" => date("H:i:s")
+            ]);
+
             exit;
         }
     }
@@ -411,6 +455,10 @@ if ($tipo === "entrada") {
         $estatusEntrada
     );
 
+/*
+    REGISTRAR SALIDA
+*/
+
 } else {
 
     if ($resultBuscar->num_rows === 0) {
@@ -457,7 +505,7 @@ if ($tipo === "entrada") {
     }
 
     /*
-        Registrar salida.
+        REGISTRAR SALIDA
         No cambiamos estatus para no borrar RETARDO.
     */
 
@@ -492,6 +540,10 @@ if ($tipo === "entrada") {
     );
 }
 
+/*
+    EJECUTAR REGISTRO
+*/
+
 if ($stmt->execute()) {
 
     if ($tipo === "entrada") {
@@ -517,6 +569,7 @@ if ($stmt->execute()) {
     ]);
 
 } else {
+
     echo json_encode([
         "success" => false,
         "message" => "Error al registrar asistencia",
