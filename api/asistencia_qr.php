@@ -33,11 +33,11 @@ $radioPermitidoMetros = 100;
 
 /*
     CONFIGURACIÓN DE RETARDOS
-    Ejemplo:
+
     Entrada: 07:00
-    Tolerancia: 10 minutos
-    Hasta 07:10 = ASISTENCIA
-    Desde 07:11 = RETARDO
+    Tolerancia: 20 minutos
+    Hasta 07:20 = ASISTENCIA
+    Desde 07:21 = RETARDO
 */
 
 $toleranciaMinutos = 20;
@@ -432,7 +432,32 @@ if ($tipo === "entrada") {
     }
 
     /*
-        Por ahora la salida solo se registra.
+        VALIDAR QUE NO REGISTRE SALIDA ANTES DE SU HORARIO
+    */
+
+    if ($horarioSalida !== null && $horarioSalida !== "") {
+
+        $horaSalidaPermitida =
+            new DateTime($fecha . " " . $horarioSalida);
+
+        $horaRegistroSalida =
+            new DateTime($ahora);
+
+        if ($horaRegistroSalida < $horaSalidaPermitida) {
+
+            echo json_encode([
+                "success" => false,
+                "message" => "No puedes registrar salida antes de tu horario. Tu salida es a las " . substr($horarioSalida, 0, 5) . ".",
+                "horario_salida" => $horarioSalida,
+                "hora_actual" => date("H:i:s")
+            ]);
+
+            exit;
+        }
+    }
+
+    /*
+        Registrar salida.
         No cambiamos estatus para no borrar RETARDO.
     */
 
