@@ -9,6 +9,8 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+date_default_timezone_set("America/Mexico_City");
+
 require_once __DIR__ . "/../../config/database.php";
 
 $db = $conexion ?? $conn ?? $mysqli ?? null;
@@ -25,6 +27,7 @@ if (!$db) {
     Semana actual:
     Lunes a viernes.
 */
+
 $hoy = new DateTime();
 
 $lunes = clone $hoy;
@@ -38,9 +41,9 @@ $fecha_fin = $viernes->format("Y-m-d");
 
 /*
     Para faltas en tiempo real:
-    NO contamos el día actual como falta todavía,
-    porque puede que el empleado aún no registre salida.
+    NO contamos el día actual como falta todavía.
 */
+
 $ayer = clone $hoy;
 $ayer->modify("-1 day");
 
@@ -50,9 +53,6 @@ if ($limite_faltas > $viernes) {
     $limite_faltas = $viernes;
 }
 
-/*
-    Función para contar días hábiles entre dos fechas.
-*/
 function contarDiasHabiles($inicio, $fin)
 {
     if ($fin < $inicio) {
@@ -78,12 +78,16 @@ function contarDiasHabiles($inicio, $fin)
     return $dias;
 }
 
-$dias_habiles_semana = contarDiasHabiles($fecha_inicio, $fecha_fin);
-$dias_habiles_transcurridos = contarDiasHabiles($fecha_inicio, $limite_faltas->format("Y-m-d"));
+$dias_habiles_semana =
+    contarDiasHabiles($fecha_inicio, $fecha_fin);
+
+$dias_habiles_transcurridos =
+    contarDiasHabiles($fecha_inicio, $limite_faltas->format("Y-m-d"));
 
 /*
     Obtener todos los empleados activos.
 */
+
 $sqlEmpleados = "SELECT 
                     id,
                     nombre,
@@ -96,6 +100,15 @@ $sqlEmpleados = "SELECT
 
 $resultEmpleados = $db->query($sqlEmpleados);
 
+if (!$resultEmpleados) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Error al consultar empleados",
+        "error" => $db->error
+    ]);
+    exit;
+}
+
 $nomina_actual = [];
 
 while ($empleado = $resultEmpleados->fetch_assoc()) {
@@ -104,8 +117,8 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
     /*
         Días trabajados:
         Cuenta los días donde tenga entrada y salida.
-        Solo de lunes a viernes de la semana actual.
     */
+
     $sqlTrabajados = "SELECT COUNT(DISTINCT fecha) AS dias_trabajados
                       FROM asistencias
                       WHERE empleado_id = ?
@@ -114,18 +127,36 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
                       AND hora_salida IS NOT NULL";
 
     $stmtTrabajados = $db->prepare($sqlTrabajados);
-    $stmtTrabajados->bind_param("iss", $empleado_id, $fecha_inicio, $fecha_fin);
+
+    if (!$stmtTrabajados) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Error al preparar días trabajados",
+            "error" => $db->error
+        ]);
+        exit;
+    }
+
+    $stmtTrabajados->bind_param(
+        "iss",
+        $empleado_id,
+        $fecha_inicio,
+        $fecha_fin
+    );
+
     $stmtTrabajados->execute();
 
-    $resultadoTrabajados = $stmtTrabajados->get_result()->fetch_assoc();
+    $resultadoTrabajados =
+        $stmtTrabajados->get_result()->fetch_assoc();
 
-    $dias_trabajados = intval($resultadoTrabajados["dias_trabajados"] ?? 0);
+    $dias_trabajados =
+        intval($resultadoTrabajados["dias_trabajados"] ?? 0);
 
     /*
         Para faltas:
         Solo revisamos días transcurridos.
-        Ejemplo: si hoy es miércoles, solo lunes y martes pueden ser falta.
     */
+
     $sqlTrabajadosTranscurridos = "SELECT COUNT(DISTINCT fecha) AS dias_trabajados_transcurridos
                                    FROM asistencias
                                    WHERE empleado_id = ?
@@ -133,24 +164,84 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
                                    AND hora_entrada IS NOT NULL
                                    AND hora_salida IS NOT NULL";
 
-    $fecha_limite_faltas = $limite_faltas->format("Y-m-d");
+    $fecha_limite_faltas =
+        $limite_faltas->format("Y-m-d");
 
     $stmtTranscurridos = $db->prepare($sqlTrabajadosTranscurridos);
-    $stmtTranscurridos->bind_param("iss", $empleado_id, $fecha_inicio, $fecha_limite_faltas);
+
+    if (!$stmtTranscurridos) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Error al preparar faltas",
+            "error" => $db->error
+        ]);
+        exit;
+    }
+
+    $stmtTranscurridos->bind_param(
+        "iss",
+        $empleado_id,
+        $fecha_inicio,
+        $fecha_limite_faltas
+    );
+
     $stmtTranscurridos->execute();
 
-    $resultadoTranscurridos = $stmtTranscurridos->get_result()->fetch_assoc();
+    $resultadoTranscurridos =
+        $stmtTranscurridos->get_result()->fetch_assoc();
 
-    $dias_trabajados_transcurridos = intval($resultadoTranscurridos["dias_trabajados_transcurridos"] ?? 0);
+    $dias_trabajados_transcurridos =
+        intval($resultadoTranscurridos["dias_trabajados_transcurridos"] ?? 0);
 
-    $faltas = $dias_habiles_transcurridos - $dias_trabajados_transcurridos;
+    $faltas =
+        $dias_habiles_transcurridos - $dias_trabajados_transcurridos;
 
     if ($faltas < 0) {
         $faltas = 0;
     }
 
-    $sueldo_diario = floatval($empleado["sueldo_diario"]);
-    $total_pago = $dias_trabajados * $sueldo_diario;
+    /*
+        Retardos:
+        Cuenta asistencias con estatus RETARDO.
+    */
+
+    $sqlRetardos = "SELECT COUNT(*) AS retardos
+                    FROM asistencias
+                    WHERE empleado_id = ?
+                    AND fecha BETWEEN ? AND ?
+                    AND estatus = 'RETARDO'";
+
+    $stmtRetardos = $db->prepare($sqlRetardos);
+
+    if (!$stmtRetardos) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Error al preparar retardos",
+            "error" => $db->error
+        ]);
+        exit;
+    }
+
+    $stmtRetardos->bind_param(
+        "iss",
+        $empleado_id,
+        $fecha_inicio,
+        $fecha_fin
+    );
+
+    $stmtRetardos->execute();
+
+    $resultadoRetardos =
+        $stmtRetardos->get_result()->fetch_assoc();
+
+    $retardos =
+        intval($resultadoRetardos["retardos"] ?? 0);
+
+    $sueldo_diario =
+        floatval($empleado["sueldo_diario"]);
+
+    $total_pago =
+        $dias_trabajados * $sueldo_diario;
 
     $nombre_completo = trim(
         $empleado["nombre"] . " " .
@@ -167,6 +258,7 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
         "dias_habiles_transcurridos" => $dias_habiles_transcurridos,
         "dias_trabajados" => $dias_trabajados,
         "faltas" => $faltas,
+        "retardos" => $retardos,
         "sueldo_diario" => $sueldo_diario,
         "total_pago" => $total_pago
     ];

@@ -9,6 +9,8 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+date_default_timezone_set("America/Mexico_City");
+
 require_once __DIR__ . "/../../config/database.php";
 
 $db = $conn ?? $conexion ?? $mysqli ?? null;
@@ -34,6 +36,7 @@ if (!$empleado_id) {
 }
 
 /* OBTENER EMPLEADO */
+
 $sqlEmpleado = "SELECT 
                     id,
                     nombre,
@@ -70,6 +73,7 @@ if (!$empleado) {
 }
 
 /* SEMANA ACTUAL LUNES A VIERNES */
+
 $hoy = new DateTime();
 
 $lunes = clone $hoy;
@@ -82,6 +86,7 @@ $fecha_inicio = $lunes->format("Y-m-d");
 $fecha_fin = $viernes->format("Y-m-d");
 
 /* PARA FALTAS: NO CONTAMOS EL DÍA ACTUAL */
+
 $ayer = clone $hoy;
 $ayer->modify("-1 day");
 
@@ -116,10 +121,14 @@ function contarDiasHabiles($inicio, $fin)
     return $dias;
 }
 
-$dias_habiles_semana = contarDiasHabiles($fecha_inicio, $fecha_fin);
-$dias_habiles_transcurridos = contarDiasHabiles($fecha_inicio, $limite_faltas->format("Y-m-d"));
+$dias_habiles_semana =
+    contarDiasHabiles($fecha_inicio, $fecha_fin);
+
+$dias_habiles_transcurridos =
+    contarDiasHabiles($fecha_inicio, $limite_faltas->format("Y-m-d"));
 
 /* DÍAS TRABAJADOS COMPLETOS */
+
 $sqlTrabajados = "SELECT COUNT(DISTINCT fecha) AS dias_trabajados
                   FROM asistencias
                   WHERE empleado_id = ?
@@ -138,15 +147,25 @@ if (!$stmtTrabajados) {
     exit;
 }
 
-$stmtTrabajados->bind_param("iss", $empleado_id, $fecha_inicio, $fecha_fin);
+$stmtTrabajados->bind_param(
+    "iss",
+    $empleado_id,
+    $fecha_inicio,
+    $fecha_fin
+);
+
 $stmtTrabajados->execute();
 
-$resultTrabajados = $stmtTrabajados->get_result()->fetch_assoc();
+$resultTrabajados =
+    $stmtTrabajados->get_result()->fetch_assoc();
 
-$dias_trabajados = intval($resultTrabajados["dias_trabajados"] ?? 0);
+$dias_trabajados =
+    intval($resultTrabajados["dias_trabajados"] ?? 0);
 
 /* DÍAS TRABAJADOS TRANSCURRIDOS PARA FALTAS */
-$fecha_limite_faltas = $limite_faltas->format("Y-m-d");
+
+$fecha_limite_faltas =
+    $limite_faltas->format("Y-m-d");
 
 $sqlTrabajadosTranscurridos = "SELECT COUNT(DISTINCT fecha) AS dias_trabajados_transcurridos
                                FROM asistencias
@@ -166,21 +185,69 @@ if (!$stmtTranscurridos) {
     exit;
 }
 
-$stmtTranscurridos->bind_param("iss", $empleado_id, $fecha_inicio, $fecha_limite_faltas);
+$stmtTranscurridos->bind_param(
+    "iss",
+    $empleado_id,
+    $fecha_inicio,
+    $fecha_limite_faltas
+);
+
 $stmtTranscurridos->execute();
 
-$resultTranscurridos = $stmtTranscurridos->get_result()->fetch_assoc();
+$resultTranscurridos =
+    $stmtTranscurridos->get_result()->fetch_assoc();
 
-$dias_trabajados_transcurridos = intval($resultTranscurridos["dias_trabajados_transcurridos"] ?? 0);
+$dias_trabajados_transcurridos =
+    intval($resultTranscurridos["dias_trabajados_transcurridos"] ?? 0);
 
-$faltas = $dias_habiles_transcurridos - $dias_trabajados_transcurridos;
+$faltas =
+    $dias_habiles_transcurridos - $dias_trabajados_transcurridos;
 
 if ($faltas < 0) {
     $faltas = 0;
 }
 
-$sueldo_diario = floatval($empleado["sueldo_diario"]);
-$total_pago = $dias_trabajados * $sueldo_diario;
+/* RETARDOS */
+
+$sqlRetardos = "SELECT COUNT(*) AS retardos
+                FROM asistencias
+                WHERE empleado_id = ?
+                AND fecha BETWEEN ? AND ?
+                AND estatus = 'RETARDO'";
+
+$stmtRetardos = $db->prepare($sqlRetardos);
+
+if (!$stmtRetardos) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Error al preparar retardos",
+        "error" => $db->error
+    ]);
+    exit;
+}
+
+$stmtRetardos->bind_param(
+    "iss",
+    $empleado_id,
+    $fecha_inicio,
+    $fecha_fin
+);
+
+$stmtRetardos->execute();
+
+$resultRetardos =
+    $stmtRetardos->get_result()->fetch_assoc();
+
+$retardos =
+    intval($resultRetardos["retardos"] ?? 0);
+
+/* PAGO */
+
+$sueldo_diario =
+    floatval($empleado["sueldo_diario"]);
+
+$total_pago =
+    $dias_trabajados * $sueldo_diario;
 
 $nombre_completo = trim(
     $empleado["nombre"] . " " .
@@ -189,6 +256,7 @@ $nombre_completo = trim(
 );
 
 /* DETALLE DE LA SEMANA */
+
 $sqlDetalle = "SELECT 
                     fecha,
                     hora_entrada,
@@ -210,10 +278,17 @@ if (!$stmtDetalle) {
     exit;
 }
 
-$stmtDetalle->bind_param("iss", $empleado_id, $fecha_inicio, $fecha_fin);
+$stmtDetalle->bind_param(
+    "iss",
+    $empleado_id,
+    $fecha_inicio,
+    $fecha_fin
+);
+
 $stmtDetalle->execute();
 
-$resultDetalle = $stmtDetalle->get_result();
+$resultDetalle =
+    $stmtDetalle->get_result();
 
 $asistencias = [];
 
@@ -222,6 +297,7 @@ while ($fila = $resultDetalle->fetch_assoc()) {
 }
 
 /* ARMAR DÍAS LUNES A VIERNES */
+
 $detalle_semana = [];
 
 $inicioDT = new DateTime($fecha_inicio);
@@ -238,9 +314,12 @@ foreach ($periodo as $fechaObj) {
         continue;
     }
 
-    $registro = $asistencias[$fecha] ?? null;
+    $registro =
+        $asistencias[$fecha] ?? null;
 
-    if ($registro && $registro["hora_entrada"] && $registro["hora_salida"]) {
+    if ($registro && $registro["estatus"] === "RETARDO") {
+        $estado = "Retardo";
+    } elseif ($registro && $registro["hora_entrada"] && $registro["hora_salida"]) {
         $estado = "Asistencia";
     } elseif ($registro && $registro["hora_entrada"] && !$registro["hora_salida"]) {
         $estado = "Entrada sin salida";
@@ -258,6 +337,7 @@ foreach ($periodo as $fechaObj) {
         "fecha" => $fecha,
         "hora_entrada" => $registro["hora_entrada"] ?? null,
         "hora_salida" => $registro["hora_salida"] ?? null,
+        "estatus" => $registro["estatus"] ?? null,
         "estado" => $estado
     ];
 }
@@ -274,6 +354,7 @@ echo json_encode([
         "dias_habiles_transcurridos" => $dias_habiles_transcurridos,
         "dias_trabajados" => $dias_trabajados,
         "faltas" => $faltas,
+        "retardos" => $retardos,
         "sueldo_diario" => $sueldo_diario,
         "total_pago" => $total_pago,
         "detalle_semana" => $detalle_semana
