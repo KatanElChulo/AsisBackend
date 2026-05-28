@@ -28,9 +28,8 @@ if (!$db) {
     Puedes obtenerlas desde Google Maps:
     clic derecho en el lugar -> copia latitud,longitud.
 */
-
-$latitudNegocio = 19.432600;
-$longitudNegocio = -99.133200;
+$latitudNegocio = 19.59949322321056;
+$longitudNegocio = -99.05848817874441;
 $radioPermitidoMetros = 100;
 
 /*
