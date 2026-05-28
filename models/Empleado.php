@@ -75,8 +75,8 @@ class Empleado
         $password = $data["password"] ?? "123456";
         $telefono = $data["telefono"] ?? "";
         $sueldo_diario = $data["sueldo_diario"] ?? 0;
-        $horario_entrada = $data["horario_entrada"] ?? "08:00:00";
-        $horario_salida = $data["horario_salida"] ?? "17:00:00";
+        $horario_entrada = $data["horario_entrada"] ?? "07:00:00";
+        $horario_salida = $data["horario_salida"] ?? "16:00:00";
 
         if (!$rol_id || $nombre === "" || $correo === "") {
             throw new Exception("Datos incompletos");
@@ -134,17 +134,12 @@ class Empleado
         $correo = $data["correo"] ?? "";
         $telefono = $data["telefono"] ?? "";
         $sueldo_diario = $data["sueldo_diario"] ?? 0;
-        $horario_entrada = $data["horario_entrada"] ?? "08:00:00";
-        $horario_salida = $data["horario_salida"] ?? "17:00:00";
+        $horario_entrada = $data["horario_entrada"] ?? "07:00:00";
+        $horario_salida = $data["horario_salida"] ?? "16:00:00";
 
         if (!$rol_id || $nombre === "" || $correo === "") {
             throw new Exception("Datos incompletos");
         }
-
-        /*
-            Si llega password, se actualiza.
-            Si no llega, se conserva el password actual.
-        */
 
         if (isset($data["password"]) && $data["password"] !== "") {
             $password = $data["password"];
@@ -169,7 +164,7 @@ class Empleado
             }
 
             $stmt->bind_param(
-                "issssssdsii",
+                "issssssdssi",
                 $rol_id,
                 $nombre,
                 $apellido_paterno,
@@ -227,12 +222,6 @@ class Empleado
     public static function eliminar($id)
     {
         $db = self::db();
-
-        /*
-            Baja lógica.
-            No borramos físicamente porque empleados se relaciona con:
-            asistencias, nominas y qr_tokens.
-        */
 
         $sql = "UPDATE empleados SET activo = 0 WHERE id = ?";
 

@@ -9,6 +9,8 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+date_default_timezone_set("America/Mexico_City");
+
 require_once __DIR__ . "/../config/database.php";
 
 $db = $conn ?? $conexion ?? $mysqli ?? null;
@@ -23,14 +25,22 @@ if (!$db) {
 
 /*
     CONFIGURACIÓN DE UBICACIÓN DEL NEGOCIO
-
-    Cambia estas coordenadas por las reales de tu local.
-    Puedes obtenerlas desde Google Maps:
-    clic derecho en el lugar -> copia latitud,longitud.
 */
+
 $latitudNegocio = 19.59949322321056;
 $longitudNegocio = -99.05848817874441;
 $radioPermitidoMetros = 100;
+
+/*
+    CONFIGURACIÓN DE RETARDOS
+    Ejemplo:
+    Entrada: 07:00
+    Tolerancia: 10 minutos
+    Hasta 07:10 = ASISTENCIA
+    Desde 07:11 = RETARDO
+*/
+
+$toleranciaMinutos = 10;
 
 /*
     FUNCION PARA CALCULAR DISTANCIA EN METROS
@@ -53,6 +63,44 @@ function calcularDistanciaMetros($lat1, $lon1, $lat2, $lon2)
     $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
     return $radioTierra * $c;
+}
+
+/*
+    FUNCION PARA DETERMINAR SI ES ASISTENCIA O RETARDO
+*/
+
+function calcularEstatusEntrada($fecha, $horaReal, $horarioEntrada, $toleranciaMinutos)
+{
+    if (!$horarioEntrada) {
+        return [
+            "estatus" => "ASISTENCIA",
+            "minutos_retardo" => 0
+        ];
+    }
+
+    $horaPermitida = new DateTime($fecha . " " . $horarioEntrada);
+    $horaPermitida->modify("+" . intval($toleranciaMinutos) . " minutes");
+
+    $horaRegistro = new DateTime($horaReal);
+
+    if ($horaRegistro > $horaPermitida) {
+        $horaOficial = new DateTime($fecha . " " . $horarioEntrada);
+        $diferencia = $horaOficial->diff($horaRegistro);
+
+        $minutosRetardo =
+            ($diferencia->h * 60) +
+            $diferencia->i;
+
+        return [
+            "estatus" => "RETARDO",
+            "minutos_retardo" => $minutosRetardo
+        ];
+    }
+
+    return [
+        "estatus" => "ASISTENCIA",
+        "minutos_retardo" => 0
+    ];
 }
 
 $data = json_decode(file_get_contents("php://input"), true);
@@ -86,6 +134,48 @@ if ($tipo !== "entrada" && $tipo !== "salida") {
 }
 
 /*
+    VALIDAR EMPLEADO Y OBTENER HORARIOS
+*/
+
+$sqlEmpleado = "SELECT 
+                    id,
+                    nombre,
+                    horario_entrada,
+                    horario_salida,
+                    activo
+                FROM empleados
+                WHERE id = ?
+                AND activo = 1
+                LIMIT 1";
+
+$stmtEmpleado = $db->prepare($sqlEmpleado);
+
+if (!$stmtEmpleado) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Error al preparar consulta de empleado",
+        "error" => $db->error
+    ]);
+    exit;
+}
+
+$stmtEmpleado->bind_param("i", $empleado_id);
+$stmtEmpleado->execute();
+
+$empleado = $stmtEmpleado->get_result()->fetch_assoc();
+
+if (!$empleado) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Empleado no encontrado o inactivo"
+    ]);
+    exit;
+}
+
+$horarioEntrada = $empleado["horario_entrada"];
+$horarioSalida = $empleado["horario_salida"];
+
+/*
     VALIDAR QUE SÍ LLEGÓ UBICACIÓN
 */
 
@@ -103,9 +193,6 @@ $precision = $precision !== null ? floatval($precision) : null;
 
 /*
     VALIDAR PRECISIÓN DEL GPS
-
-    Si el celular reporta una precisión muy mala, se bloquea.
-    Puedes subirlo a 150 o 200 si a tus empleados les falla mucho.
 */
 
 if ($precision !== null && $precision > 150) {
@@ -232,7 +319,7 @@ $ahora = date("Y-m-d H:i:s");
     BUSCAR ASISTENCIA DEL DÍA
 */
 
-$sqlBuscar = "SELECT id, hora_entrada, hora_salida
+$sqlBuscar = "SELECT id, hora_entrada, hora_salida, estatus
               FROM asistencias
               WHERE empleado_id = ?
               AND fecha = ?
@@ -269,6 +356,20 @@ if ($tipo === "entrada") {
         }
     }
 
+    /*
+        CALCULAR ASISTENCIA O RETARDO
+    */
+
+    $resultadoEstatus = calcularEstatusEntrada(
+        $fecha,
+        $ahora,
+        $horarioEntrada,
+        $toleranciaMinutos
+    );
+
+    $estatusEntrada = $resultadoEstatus["estatus"];
+    $minutosRetardo = $resultadoEstatus["minutos_retardo"];
+
     $sql = "INSERT INTO asistencias (
                 empleado_id,
                 fecha,
@@ -279,14 +380,14 @@ if ($tipo === "entrada") {
                 metodo_registro,
                 estatus
             )
-            VALUES (?, ?, ?, ?, ?, ?, 'QR', 'ASISTENCIA')
+            VALUES (?, ?, ?, ?, ?, ?, 'QR', ?)
             ON DUPLICATE KEY UPDATE
                 hora_entrada = VALUES(hora_entrada),
                 latitud_entrada = VALUES(latitud_entrada),
                 longitud_entrada = VALUES(longitud_entrada),
                 token_entrada = VALUES(token_entrada),
                 metodo_registro = 'QR',
-                estatus = 'ASISTENCIA'";
+                estatus = VALUES(estatus)";
 
     $stmt = $db->prepare($sql);
 
@@ -300,13 +401,14 @@ if ($tipo === "entrada") {
     }
 
     $stmt->bind_param(
-        "issdds",
+        "issddss",
         $empleado_id,
         $fecha,
         $ahora,
         $latitud,
         $longitud,
-        $token
+        $token,
+        $estatusEntrada
     );
 
 } else {
@@ -328,6 +430,11 @@ if ($tipo === "entrada") {
         ]);
         exit;
     }
+
+    /*
+        Por ahora la salida solo se registra.
+        No cambiamos estatus para no borrar RETARDO.
+    */
 
     $sql = "UPDATE asistencias
             SET hora_salida = ?,
@@ -361,13 +468,29 @@ if ($tipo === "entrada") {
 }
 
 if ($stmt->execute()) {
+
+    if ($tipo === "entrada") {
+
+        if ($estatusEntrada === "RETARDO") {
+            $mensaje = "Entrada registrada con RETARDO. Retardo aproximado: " . $minutosRetardo . " minutos.";
+        } else {
+            $mensaje = "Entrada registrada correctamente";
+        }
+
+    } else {
+        $mensaje = "Salida registrada correctamente";
+    }
+
     echo json_encode([
         "success" => true,
-        "message" => $tipo === "entrada"
-            ? "Entrada registrada correctamente"
-            : "Salida registrada correctamente",
+        "message" => $mensaje,
+        "estatus" => $tipo === "entrada" ? $estatusEntrada : ($asistencia["estatus"] ?? null),
+        "minutos_retardo" => $tipo === "entrada" ? $minutosRetardo : 0,
+        "horario_entrada" => $horarioEntrada,
+        "horario_salida" => $horarioSalida,
         "distancia_metros" => round($distanciaMetros, 2)
     ]);
+
 } else {
     echo json_encode([
         "success" => false,
