@@ -53,6 +53,9 @@ if ($limite_faltas > $viernes) {
     $limite_faltas = $viernes;
 }
 
+$fecha_limite_faltas =
+    $limite_faltas->format("Y-m-d");
+
 function contarDiasHabiles($inicio, $fin)
 {
     if ($fin < $inicio) {
@@ -82,7 +85,7 @@ $dias_habiles_semana =
     contarDiasHabiles($fecha_inicio, $fecha_fin);
 
 $dias_habiles_transcurridos =
-    contarDiasHabiles($fecha_inicio, $limite_faltas->format("Y-m-d"));
+    contarDiasHabiles($fecha_inicio, $fecha_limite_faltas);
 
 /*
     Obtener todos los empleados activos.
@@ -153,8 +156,7 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
         intval($resultadoTrabajados["dias_trabajados"] ?? 0);
 
     /*
-        Para faltas:
-        Solo revisamos días transcurridos.
+        Días trabajados transcurridos para faltas.
     */
 
     $sqlTrabajadosTranscurridos = "SELECT COUNT(DISTINCT fecha) AS dias_trabajados_transcurridos
@@ -163,9 +165,6 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
                                    AND fecha BETWEEN ? AND ?
                                    AND hora_entrada IS NOT NULL
                                    AND hora_salida IS NOT NULL";
-
-    $fecha_limite_faltas =
-        $limite_faltas->format("Y-m-d");
 
     $stmtTranscurridos = $db->prepare($sqlTrabajadosTranscurridos);
 
@@ -193,8 +192,104 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
     $dias_trabajados_transcurridos =
         intval($resultadoTranscurridos["dias_trabajados_transcurridos"] ?? 0);
 
+    /*
+        Justificaciones aprobadas de toda la semana.
+    */
+
+    $sqlJustificadas = "SELECT COUNT(*) AS justificadas
+                        FROM justificaciones j
+                        WHERE j.empleado_id = ?
+                        AND j.fecha_falta BETWEEN ? AND ?
+                        AND j.estado = 'APROBADA'
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM asistencias a
+                            WHERE a.empleado_id = j.empleado_id
+                            AND a.fecha = j.fecha_falta
+                            AND a.hora_entrada IS NOT NULL
+                            AND a.hora_salida IS NOT NULL
+                        )";
+
+    $stmtJustificadas = $db->prepare($sqlJustificadas);
+
+    if (!$stmtJustificadas) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Error al preparar justificaciones",
+            "error" => $db->error
+        ]);
+        exit;
+    }
+
+    $stmtJustificadas->bind_param(
+        "iss",
+        $empleado_id,
+        $fecha_inicio,
+        $fecha_fin
+    );
+
+    $stmtJustificadas->execute();
+
+    $resultadoJustificadas =
+        $stmtJustificadas->get_result()->fetch_assoc();
+
+    $justificadas =
+        intval($resultadoJustificadas["justificadas"] ?? 0);
+
+    /*
+        Justificaciones aprobadas transcurridas para faltas.
+    */
+
+    $sqlJustificadasTranscurridas = "SELECT COUNT(*) AS justificadas_transcurridas
+                                     FROM justificaciones j
+                                     WHERE j.empleado_id = ?
+                                     AND j.fecha_falta BETWEEN ? AND ?
+                                     AND j.estado = 'APROBADA'
+                                     AND NOT EXISTS (
+                                        SELECT 1
+                                        FROM asistencias a
+                                        WHERE a.empleado_id = j.empleado_id
+                                        AND a.fecha = j.fecha_falta
+                                        AND a.hora_entrada IS NOT NULL
+                                        AND a.hora_salida IS NOT NULL
+                                     )";
+
+    $stmtJustificadasTranscurridas =
+        $db->prepare($sqlJustificadasTranscurridas);
+
+    if (!$stmtJustificadasTranscurridas) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Error al preparar justificaciones transcurridas",
+            "error" => $db->error
+        ]);
+        exit;
+    }
+
+    $stmtJustificadasTranscurridas->bind_param(
+        "iss",
+        $empleado_id,
+        $fecha_inicio,
+        $fecha_limite_faltas
+    );
+
+    $stmtJustificadasTranscurridas->execute();
+
+    $resultadoJustificadasTranscurridas =
+        $stmtJustificadasTranscurridas->get_result()->fetch_assoc();
+
+    $justificadas_transcurridas =
+        intval($resultadoJustificadasTranscurridas["justificadas_transcurridas"] ?? 0);
+
+    /*
+        Faltas:
+        días transcurridos - trabajados - justificadas aprobadas.
+    */
+
     $faltas =
-        $dias_habiles_transcurridos - $dias_trabajados_transcurridos;
+        $dias_habiles_transcurridos -
+        $dias_trabajados_transcurridos -
+        $justificadas_transcurridas;
 
     if ($faltas < 0) {
         $faltas = 0;
@@ -240,8 +335,11 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
     $sueldo_diario =
         floatval($empleado["sueldo_diario"]);
 
+    $dias_pagados =
+        $dias_trabajados + $justificadas;
+
     $total_pago =
-        $dias_trabajados * $sueldo_diario;
+        $dias_pagados * $sueldo_diario;
 
     $nombre_completo = trim(
         $empleado["nombre"] . " " .
@@ -257,6 +355,8 @@ while ($empleado = $resultEmpleados->fetch_assoc()) {
         "dias_habiles_semana" => $dias_habiles_semana,
         "dias_habiles_transcurridos" => $dias_habiles_transcurridos,
         "dias_trabajados" => $dias_trabajados,
+        "justificadas" => $justificadas,
+        "dias_pagados" => $dias_pagados,
         "faltas" => $faltas,
         "retardos" => $retardos,
         "sueldo_diario" => $sueldo_diario,
