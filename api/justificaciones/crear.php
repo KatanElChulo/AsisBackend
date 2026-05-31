@@ -23,10 +23,6 @@ if (!$db) {
     exit;
 }
 
-/*
-    VALIDAR MÉTODO
-*/
-
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     echo json_encode([
         "success" => false,
@@ -34,11 +30,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     ]);
     exit;
 }
-
-/*
-    DATOS RECIBIDOS
-    Como subiremos archivo, usamos $_POST y $_FILES.
-*/
 
 $empleado_id = $_POST["empleado_id"] ?? null;
 $admin_id = $_POST["admin_id"] ?? null;
@@ -48,7 +39,13 @@ $motivo = $_POST["motivo"] ?? null;
 if (!$empleado_id || !$admin_id || !$fecha_falta || !$motivo) {
     echo json_encode([
         "success" => false,
-        "message" => "Datos incompletos"
+        "message" => "Datos incompletos",
+        "debug" => [
+            "empleado_id" => $empleado_id,
+            "admin_id" => $admin_id,
+            "fecha_falta" => $fecha_falta,
+            "motivo" => $motivo
+        ]
     ]);
     exit;
 }
@@ -56,7 +53,8 @@ if (!$empleado_id || !$admin_id || !$fecha_falta || !$motivo) {
 if (!isset($_FILES["archivo"])) {
     echo json_encode([
         "success" => false,
-        "message" => "No se recibió ningún archivo"
+        "message" => "No se recibió ningún archivo",
+        "files_recibidos" => array_keys($_FILES)
     ]);
     exit;
 }
@@ -73,79 +71,7 @@ if ($archivo["error"] !== UPLOAD_ERR_OK) {
 }
 
 /*
-    VALIDAR TAMAÑO
-    Máximo 5 MB.
-*/
-
-$tamanoMaximo = 5 * 1024 * 1024;
-
-if ($archivo["size"] > $tamanoMaximo) {
-    echo json_encode([
-        "success" => false,
-        "message" => "El archivo es demasiado grande. Máximo permitido: 5 MB"
-    ]);
-    exit;
-}
-
-/*
-    VALIDAR EXTENSIÓN
-*/
-
-$nombreOriginal = $archivo["name"];
-$extension = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
-
-$extensionesPermitidas = ["jpg", "jpeg", "png", "pdf"];
-
-if (!in_array($extension, $extensionesPermitidas)) {
-    echo json_encode([
-        "success" => false,
-        "message" => "Formato no permitido. Solo se aceptan JPG, PNG o PDF"
-    ]);
-    exit;
-}
-
-/*
-    CREAR CARPETA SI NO EXISTE
-*/
-
-$carpetaDestino = __DIR__ . "/../../uploads/justificaciones/";
-
-if (!is_dir($carpetaDestino)) {
-    mkdir($carpetaDestino, 0755, true);
-}
-
-/*
-    GENERAR NOMBRE SEGURO
-*/
-
-$nombreArchivo = "justificacion_" .
-    intval($empleado_id) . "_" .
-    str_replace("-", "", $fecha_falta) . "_" .
-    time() . "." .
-    $extension;
-
-$rutaFinal = $carpetaDestino . $nombreArchivo;
-
-/*
-    MOVER ARCHIVO
-*/
-
-if (!move_uploaded_file($archivo["tmp_name"], $rutaFinal)) {
-    echo json_encode([
-        "success" => false,
-        "message" => "No se pudo guardar el archivo en el servidor"
-    ]);
-    exit;
-}
-
-/*
-    RUTA QUE SE GUARDARÁ EN BASE DE DATOS
-*/
-
-$rutaBD = "uploads/justificaciones/" . $nombreArchivo;
-
-/*
-    EVITAR DUPLICADOS PENDIENTES O APROBADOS PARA LA MISMA FECHA
+    EVITAR DUPLICADOS ANTES DE MOVER EL ARCHIVO
 */
 
 $sqlExiste = "SELECT id, estado
@@ -180,6 +106,109 @@ if ($existe) {
 }
 
 /*
+    VALIDAR TAMAÑO
+*/
+
+$tamanoMaximo = 5 * 1024 * 1024;
+
+if ($archivo["size"] > $tamanoMaximo) {
+    echo json_encode([
+        "success" => false,
+        "message" => "El archivo es demasiado grande. Máximo permitido: 5 MB"
+    ]);
+    exit;
+}
+
+/*
+    VALIDAR EXTENSIÓN
+*/
+
+$nombreOriginal = $archivo["name"];
+$extension = strtolower(pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+
+$extensionesPermitidas = ["jpg", "jpeg", "png", "pdf"];
+
+if (!in_array($extension, $extensionesPermitidas)) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Formato no permitido. Solo se aceptan JPG, JPEG, PNG o PDF"
+    ]);
+    exit;
+}
+
+/*
+    CARPETA DESTINO
+
+    Este archivo está en:
+    AsisBackend/api/justificaciones/crear.php
+
+    Entonces ../../uploads/justificaciones/ apunta a:
+    AsisBackend/uploads/justificaciones/
+*/
+
+$carpetaDestino = __DIR__ . "/../../uploads/justificaciones/";
+
+if (!is_dir($carpetaDestino)) {
+    if (!mkdir($carpetaDestino, 0755, true)) {
+        echo json_encode([
+            "success" => false,
+            "message" => "No se pudo crear la carpeta de destino",
+            "carpetaDestino" => $carpetaDestino
+        ]);
+        exit;
+    }
+}
+
+if (!is_writable($carpetaDestino)) {
+    echo json_encode([
+        "success" => false,
+        "message" => "La carpeta de destino no tiene permisos de escritura",
+        "carpetaDestino" => $carpetaDestino
+    ]);
+    exit;
+}
+
+/*
+    GENERAR NOMBRE SEGURO
+*/
+
+$nombreArchivo =
+    "justificacion_" .
+    intval($empleado_id) . "_" .
+    str_replace("-", "", $fecha_falta) . "_" .
+    time() . "." .
+    $extension;
+
+$rutaFinal = $carpetaDestino . $nombreArchivo;
+
+/*
+    MOVER ARCHIVO FÍSICO A LA CARPETA
+*/
+
+if (!move_uploaded_file($archivo["tmp_name"], $rutaFinal)) {
+    echo json_encode([
+        "success" => false,
+        "message" => "No se pudo guardar el archivo en el servidor",
+        "debug" => [
+            "tmp_name" => $archivo["tmp_name"],
+            "rutaFinal" => $rutaFinal,
+            "carpetaDestino" => $carpetaDestino,
+            "existe_carpeta" => is_dir($carpetaDestino),
+            "carpeta_escribible" => is_writable($carpetaDestino)
+        ]
+    ]);
+    exit;
+}
+
+chmod($rutaFinal, 0644);
+
+/*
+    RUTA QUE SE GUARDA EN BASE DE DATOS
+*/
+
+$rutaBD = "uploads/justificaciones/" . $nombreArchivo;
+
+/*
     INSERTAR JUSTIFICACIÓN
 */
 
@@ -198,6 +227,10 @@ $sql = "INSERT INTO justificaciones
 $stmt = $db->prepare($sql);
 
 if (!$stmt) {
+    if (file_exists($rutaFinal)) {
+        unlink($rutaFinal);
+    }
+
     echo json_encode([
         "success" => false,
         "message" => "Error al preparar registro",
@@ -216,6 +249,10 @@ $stmt->bind_param(
 );
 
 if (!$stmt->execute()) {
+    if (file_exists($rutaFinal)) {
+        unlink($rutaFinal);
+    }
+
     echo json_encode([
         "success" => false,
         "message" => "Error al guardar justificación",
@@ -226,5 +263,9 @@ if (!$stmt->execute()) {
 
 echo json_encode([
     "success" => true,
-    "message" => "Justificación enviada correctamente. Queda pendiente de revisión."
+    "message" => "Justificación enviada correctamente. Queda pendiente de revisión.",
+    "archivo" => $rutaBD,
+    "ruta_fisica" => $rutaFinal
 ]);
+
+?>
