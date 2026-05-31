@@ -27,8 +27,8 @@ if (!$db) {
     CONFIGURACIÓN DE UBICACIÓN DEL NEGOCIO
 */
 
-$latitudNegocio = 19.59949322321056;
-$longitudNegocio = -99.05848817874441;
+$latitudNegocio = 19.597306585859915;
+$longitudNegocio = -99.05703136532902;
 $radioPermitidoMetros = 100;
 
 /*
