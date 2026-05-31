@@ -24,7 +24,7 @@ if (!$db) {
 }
 
 /*
-    Se puede recibir admin_id por:
+    Recibe admin_id por:
     - GET: listar_admin.php?admin_id=1
     - POST JSON: { "admin_id": 1 }
 */
@@ -98,31 +98,25 @@ $justificaciones = [];
 while ($fila = $resultado->fetch_assoc()) {
 
     $fila["empleado"] = trim(
-        $fila["nombre"] . " " .
-        $fila["apellido_paterno"] . " " .
-        $fila["apellido_materno"]
+        ($fila["nombre"] ?? "") . " " .
+        ($fila["apellido_paterno"] ?? "") . " " .
+        ($fila["apellido_materno"] ?? "")
     );
 
     /*
-        En la base de datos debe estar guardado algo como:
-        uploads/justificaciones/justificacion_20_20260530_123456.pdf
+        En vez de abrir directo:
+        /AsisProyecto/AsisBackend/uploads/justificaciones/archivo.png
 
-        Entonces aquí armamos una ruta absoluta desde el dominio:
-        /AsisProyecto/AsisBackend/uploads/justificaciones/archivo.pdf
+        Usamos esta API:
+        /AsisProyecto/AsisBackend/api/justificaciones/ver_archivo.php?id=ID
+
+        Así evitamos problemas de rutas, permisos o 404 falsos.
     */
 
-    $archivo = $fila["archivo"];
-
-    if ($archivo) {
-
-        // Quitar diagonales iniciales por si se guardó como /uploads/...
-        $archivo = ltrim($archivo, "/");
-
+    if (!empty($fila["archivo"])) {
         $fila["archivo_url"] =
-            "/AsisProyecto/AsisBackend/" . $archivo;
-
+            "/AsisProyecto/AsisBackend/api/justificaciones/ver_archivo.php?id=" . $fila["id"];
     } else {
-
         $fila["archivo_url"] = null;
     }
 
