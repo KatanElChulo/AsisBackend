@@ -240,31 +240,33 @@ class Empleado
         return true;
     }
 
-    public static function login($correo)
-    {
-        $db = self::db();
+   public static function login($correo)
+{
+    $db = self::db();
 
-        $sql = "SELECT 
-                    empleados.*,
-                    roles.nombre AS rol_nombre
-                FROM empleados
-                INNER JOIN roles
-                ON empleados.rol_id = roles.id
-                WHERE empleados.correo = ?
-                AND empleados.activo = 1
-                LIMIT 1";
+    $correo = trim($correo);
 
-        $stmt = $db->prepare($sql);
+    $sql = "SELECT 
+                empleados.*,
+                roles.nombre AS rol_nombre
+            FROM empleados
+            LEFT JOIN roles
+            ON empleados.rol_id = roles.id
+            WHERE TRIM(LOWER(empleados.correo)) = TRIM(LOWER(?))
+            AND empleados.activo = 1
+            LIMIT 1";
 
-        if (!$stmt) {
-            throw new Exception("Error al preparar login: " . $db->error);
-        }
+    $stmt = $db->prepare($sql);
 
-        $stmt->bind_param("s", $correo);
-        $stmt->execute();
-
-        $resultado = $stmt->get_result();
-
-        return $resultado->fetch_assoc();
+    if (!$stmt) {
+        throw new Exception("Error al preparar login: " . $db->error);
     }
+
+    $stmt->bind_param("s", $correo);
+    $stmt->execute();
+
+    $resultado = $stmt->get_result();
+
+    return $resultado->fetch_assoc();
+}
 }
