@@ -44,6 +44,10 @@ if (!$admin_id) {
     exit;
 }
 
+/*
+    CONSULTAR JUSTIFICACIONES ASIGNADAS AL ADMIN
+*/
+
 $sql = "SELECT
             j.id,
             j.empleado_id,
@@ -92,6 +96,7 @@ $resultado = $stmt->get_result();
 $justificaciones = [];
 
 while ($fila = $resultado->fetch_assoc()) {
+
     $fila["empleado"] = trim(
         $fila["nombre"] . " " .
         $fila["apellido_paterno"] . " " .
@@ -99,13 +104,27 @@ while ($fila = $resultado->fetch_assoc()) {
     );
 
     /*
-        La ruta real guardada es:
-        uploads/justificaciones/archivo.pdf
+        En la base de datos debe estar guardado algo como:
+        uploads/justificaciones/justificacion_20_20260530_123456.pdf
 
-        Desde el frontend se puede abrir con:
-        ../../AsisBackend/ + archivo
+        Entonces aquí armamos una ruta absoluta desde el dominio:
+        /AsisProyecto/AsisBackend/uploads/justificaciones/archivo.pdf
     */
-    $fila["archivo_url"] = "../../AsisBackend/" . $fila["archivo"];
+
+    $archivo = $fila["archivo"];
+
+    if ($archivo) {
+
+        // Quitar diagonales iniciales por si se guardó como /uploads/...
+        $archivo = ltrim($archivo, "/");
+
+        $fila["archivo_url"] =
+            "/AsisProyecto/AsisBackend/" . $archivo;
+
+    } else {
+
+        $fila["archivo_url"] = null;
+    }
 
     $justificaciones[] = $fila;
 }
@@ -114,3 +133,5 @@ echo json_encode([
     "success" => true,
     "data" => $justificaciones
 ]);
+
+?>
